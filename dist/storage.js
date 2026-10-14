@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Storage abstraction - ported from traccar-rs Store trait.
 /** In-memory store implementation for testing. */
@@ -49,7 +49,17 @@ export class MemoryStore {
                 const av = this.getNestedValue(a, filter.orderBy.field);
                 const bv = this.getNestedValue(b, filter.orderBy.field);
                 const dir = filter.orderBy.direction === "ASC" ? 1 : -1;
-                return av > bv ? dir : av < bv ? -dir : 0;
+                if (av == null && bv == null)
+                    return 0;
+                if (av == null)
+                    return -dir;
+                if (bv == null)
+                    return dir;
+                if (av > bv)
+                    return dir;
+                if (av < bv)
+                    return -dir;
+                return 0;
             });
         }
         if (filter.offset)

@@ -3,7 +3,7 @@
 //
 // Storage abstraction - ported from traccar-rs Store trait.
 
-import type { Position, Device, User, Event, Command, QueuedCommand, Notification, ShareToken, Group, Geofence } from "./models.ts";
+import type { Position, Device, User, Event, Command, QueuedCommand, Notification, ShareToken, Group, Geofence } from "./models";
 
 export type EntityKind =
   | "user"
@@ -88,7 +88,7 @@ export class MemoryStore implements Store {
     const map = this.getMap(filter.kind);
     let results = Array.from(map.values());
     for (const cond of filter.conditions) {
-      results = results.filter((item: any) => {
+      results = results.filter((item: unknown) => {
         const value = this.getNestedValue(item, cond.field);
         switch (cond.operator) {
           case "=": return value === cond.value;
@@ -102,11 +102,16 @@ export class MemoryStore implements Store {
       });
     }
     if (filter.orderBy) {
-      results.sort((a: any, b: any) => {
+      results.sort((a: unknown, b: unknown) => {
         const av = this.getNestedValue(a, filter.orderBy!.field);
         const bv = this.getNestedValue(b, filter.orderBy!.field);
         const dir = filter.orderBy!.direction === "ASC" ? 1 : -1;
-        return av > bv ? dir : av < bv ? -dir : 0;
+        if (av == null && bv == null) return 0;
+        if (av == null) return -dir;
+        if (bv == null) return dir;
+        if (av > bv) return dir;
+        if (av < bv) return -dir;
+        return 0;
       });
     }
     if (filter.offset) results = results.slice(filter.offset);
@@ -192,6 +197,6 @@ export class MemoryStore implements Store {
   }
 
   private getNestedValue(obj: unknown, path: string): unknown {
-    return path.split(".").reduce((acc: any, key) => acc?.[key], obj);
+    return path.split(".").reduce((acc: unknown, key: string) => (acc as Record<string, unknown>)?.[key], obj);
   }
 }

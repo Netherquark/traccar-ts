@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Processing pipeline - ported from traccar-rs processing.rs
 const EARTH_RADIUS_METERS = 6371000;
@@ -20,7 +20,7 @@ export function calculateDistance(positions) {
     for (let i = 1; i < positions.length; i++) {
         const prev = positions[i - 1];
         const curr = positions[i];
-        if (prev.valid && curr.valid) {
+        if (prev !== undefined && curr !== undefined && prev.valid && curr.valid) {
             total += distanceMeters(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
         }
     }
@@ -28,13 +28,15 @@ export function calculateDistance(positions) {
 }
 /** Motion detection: explicit motion attr > ignition attr > speed threshold. */
 export function detectMotion(position, prevPosition) {
-    if (position.attributes.motion === true)
+    if (!position.valid)
+        return false;
+    if (position.attributes?.motion === true)
         return true;
-    if (position.attributes.ignition === true)
+    if (position.attributes?.ignition === true)
         return true;
     if (position.speed >= MOTION_SPEED_THRESHOLD_KNOTS)
         return true;
-    if (prevPosition && position.valid && prevPosition.valid) {
+    if (prevPosition && prevPosition.valid) {
         const dist = distanceMeters(prevPosition.latitude, prevPosition.longitude, position.latitude, position.longitude);
         if (dist > 50)
             return true; // moved more than 50m
@@ -66,8 +68,12 @@ function pointInCircle(lat, lon, circle) {
 function pointInPolygon(lat, lon, polygon) {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lon, yi = polygon[i].lat;
-        const xj = polygon[j].lon, yj = polygon[j].lat;
+        const pi = polygon[i];
+        const pj = polygon[j];
+        if (pi === undefined || pj === undefined)
+            continue;
+        const xi = pi.lon, yi = pi.lat;
+        const xj = pj.lon, yj = pj.lat;
         const intersect = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
         if (intersect)
             inside = !inside;
@@ -106,11 +112,16 @@ export async function processPosition(position, previousPosition, deviceAttribut
         }
     }
     if (geofenceEvents.length > 0) {
-        processed.geofenceIds = geofences.filter((_, i) => geofenceEvents.some((e) => e.includes(`:${geofences[i].id}`))).map((g) => g.id);
+        processed.geofenceIds = geofences
+            .filter((_, i) => geofenceEvents.some((e) => {
+            const gf = geofences[i];
+            return gf !== undefined && e.includes(`:${gf.id}`);
+        }))
+            .map((g) => g.id);
         processed.events = geofenceEvents;
     }
     // Alarm events
-    if (position.attributes.alarm) {
+    if (position.attributes?.alarm) {
         const alarms = alarmToEventType(String(position.attributes.alarm));
         processed.events = [...(processed.events ?? []), ...alarms];
     }
@@ -118,19 +129,19 @@ export async function processPosition(position, previousPosition, deviceAttribut
 }
 function parseWktCircle(wkt) {
     const match = wkt.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([-\d.]+)\s*\)/i);
-    if (!match)
+    if (!match || !match[1] || !match[2] || !match[3])
         return null;
     return { lat: parseFloat(match[1]), lon: parseFloat(match[2]), radius: parseFloat(match[3]) };
 }
 function parseWktPolygon(wkt) {
     const match = wkt.match(/POLYGON\s*\(\s*\((.*)\)\s*\)/i);
-    if (!match)
+    if (!match || !match[1])
         return null;
     const coords = match[1].split(",").map((c) => c.trim());
     const points = [];
     for (const coord of coords) {
         const parts = coord.split(/\s+/);
-        if (parts.length >= 2) {
+        if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
             points.push({ lon: parseFloat(parts[0]), lat: parseFloat(parts[1]) });
         }
     }

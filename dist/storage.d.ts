@@ -1,5 +1,5 @@
-import type { Position, Device, User, Event, QueuedCommand, ShareToken } from "./models.ts";
-export type EntityKind = "user" | "device" | "group" | "geofence" | "calendar" | "driver" | "maintenance" | "order" | "attribute" | "command" | "queuedCommand" | "notification" | "event" | "permission" | "position" | "server" | "revokedToken" | "audit";
+import type { Position, Device, User, Event, QueuedCommand, ShareToken } from "./models";
+export type EntityKind = "user" | "device" | "group" | "geofence" | "calendar" | "driver" | "maintenance" | "order" | "attribute" | "command" | "queuedCommand" | "notification" | "event" | "permission" | "position" | "server" | "revokedToken" | "audit" | "shareToken";
 export interface Filter {
     kind: EntityKind;
     conditions: Array<{

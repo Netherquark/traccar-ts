@@ -35,7 +35,7 @@ export async function hashPassword(password: string): Promise<string> {
     ["deriveBits"],
   );
   const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: new Uint8Array(salt.buffer), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     keyMaterial,
     PBKDF2_HASH_LENGTH * 8,
   );
@@ -53,8 +53,8 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   }
   const parts = storedHash.split("$");
   if (parts.length !== 3) return false;
-  const iterations = parseInt(parts[1], 10);
-  const combined = base64UrlToBuffer(parts[2]);
+  const iterations = parseInt(parts[1] ?? "0", 10);
+  const combined = base64UrlToBuffer(parts[2] ?? "");
   if (combined.length < SALT_LENGTH + PBKDF2_HASH_LENGTH) return false;
   const salt = combined.slice(0, SALT_LENGTH);
   const hash = combined.slice(SALT_LENGTH);
@@ -67,7 +67,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    { name: "PBKDF2", salt: new Uint8Array(salt.buffer), iterations, hash: "SHA-256" },
     keyMaterial,
     PBKDF2_HASH_LENGTH * 8,
   );
@@ -102,7 +102,9 @@ export async function signToken(payload: TokenPayload, secret: string): Promise<
 export async function verifyToken(token: string, secret: string): Promise<TokenPayload | null> {
   const parts = token.split(".");
   if (parts.length !== 2) return null;
-  const [payloadB64, sigB64] = parts;
+  const payloadB64 = parts[0];
+  const sigB64 = parts[1];
+  if (!payloadB64 || !sigB64) return null;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -111,7 +113,7 @@ export async function verifyToken(token: string, secret: string): Promise<TokenP
     false,
     ["verify"],
   );
-  let signature: Uint8Array;
+  let signature: Uint8Array<ArrayBuffer>;
   try {
     signature = base64UrlToBuffer(sigB64);
   } catch {
@@ -138,7 +140,11 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) {
-    diff |= a[i] ^ b[i];
+    const av = a[i];
+    const bv = b[i];
+    if (av !== undefined && bv !== undefined) {
+      diff |= av ^ bv;
+    }
   }
   return diff === 0;
 }
@@ -151,14 +157,15 @@ function bufferToBase64Url(buf: Uint8Array): string {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function base64UrlToBuffer(str: string): Uint8Array {
-  str = str.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = str.length % 4;
-  if (pad) str += "=".repeat(4 - pad);
-  const binary = atob(str);
-  const bytes = new Uint8Array(binary.length);
+function base64UrlToBuffer(str: string): Uint8Array<ArrayBuffer> {
+  let s = str.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = s.length % 4;
+  if (pad) s += "=".repeat(4 - pad);
+  const binary = atob(s);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes;
+  return bytes as Uint8Array<ArrayBuffer>;
 }

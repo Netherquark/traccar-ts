@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Auth utilities ported from traccar-rs:
 // - PBKDF2-HMAC-SHA256 password hashing (200k iterations)
@@ -14,7 +14,7 @@ export async function hashPassword(password) {
     const encoder = new TextEncoder();
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
     const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]);
-    const hash = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, keyMaterial, PBKDF2_HASH_LENGTH * 8);
+    const hash = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: new Uint8Array(salt.buffer), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, keyMaterial, PBKDF2_HASH_LENGTH * 8);
     const hashBytes = new Uint8Array(hash);
     const combined = new Uint8Array(salt.length + hashBytes.length);
     combined.set(salt);
@@ -29,15 +29,15 @@ export async function verifyPassword(password, storedHash) {
     const parts = storedHash.split("$");
     if (parts.length !== 3)
         return false;
-    const iterations = parseInt(parts[1], 10);
-    const combined = base64UrlToBuffer(parts[2]);
+    const iterations = parseInt(parts[1] ?? "0", 10);
+    const combined = base64UrlToBuffer(parts[2] ?? "");
     if (combined.length < SALT_LENGTH + PBKDF2_HASH_LENGTH)
         return false;
     const salt = combined.slice(0, SALT_LENGTH);
     const hash = combined.slice(SALT_LENGTH);
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]);
-    const derived = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, keyMaterial, PBKDF2_HASH_LENGTH * 8);
+    const derived = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: new Uint8Array(salt.buffer), iterations, hash: "SHA-256" }, keyMaterial, PBKDF2_HASH_LENGTH * 8);
     const derivedBytes = new Uint8Array(derived);
     return constantTimeEqual(hash, derivedBytes);
 }
@@ -50,26 +50,37 @@ export function generateTokenSecret() {
 export async function signToken(payload, secret) {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const data = encoder.encode(JSON.stringify(payload));
-    const signature = await crypto.subtle.sign("HMAC", key, data);
+    const payloadJson = JSON.stringify(payload);
+    const payloadB64 = bufferToBase64Url(encoder.encode(payloadJson));
+    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadB64));
     const sigBytes = new Uint8Array(signature);
-    return `${bufferToBase64Url(encoder.encode(JSON.stringify(payload)))}.${bufferToBase64Url(sigBytes)}`;
+    return `${payloadB64}.${bufferToBase64Url(sigBytes)}`;
 }
 /** Verify and decode a signed token. */
 export async function verifyToken(token, secret) {
     const parts = token.split(".");
     if (parts.length !== 2)
         return null;
-    const [payloadB64, sigB64] = parts;
+    const payloadB64 = parts[0];
+    const sigB64 = parts[1];
+    if (!payloadB64 || !sigB64)
+        return null;
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-    const signature = base64UrlToBuffer(sigB64);
+    let signature;
+    try {
+        signature = base64UrlToBuffer(sigB64);
+    }
+    catch {
+        return null;
+    }
     const valid = await crypto.subtle.verify("HMAC", key, signature, encoder.encode(payloadB64));
     if (!valid)
         return null;
     try {
-        const payloadJson = bufferToBase64Url(base64UrlToBuffer(payloadB64));
-        return JSON.parse(payloadJson);
+        const payloadBytes = base64UrlToBuffer(payloadB64);
+        const decoder = new TextDecoder();
+        return JSON.parse(decoder.decode(payloadBytes));
     }
     catch {
         return null;
@@ -81,7 +92,11 @@ function constantTimeEqual(a, b) {
         return false;
     let diff = 0;
     for (let i = 0; i < a.length; i++) {
-        diff |= a[i] ^ b[i];
+        const av = a[i];
+        const bv = b[i];
+        if (av !== undefined && bv !== undefined) {
+            diff |= av ^ bv;
+        }
     }
     return diff === 0;
 }
@@ -93,12 +108,13 @@ function bufferToBase64Url(buf) {
     return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 function base64UrlToBuffer(str) {
-    str = str.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = str.length % 4;
+    let s = str.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = s.length % 4;
     if (pad)
-        str += "=".repeat(4 - pad);
-    const binary = atob(str);
-    const bytes = new Uint8Array(binary.length);
+        s += "=".repeat(4 - pad);
+    const binary = atob(s);
+    const buffer = new ArrayBuffer(binary.length);
+    const bytes = new Uint8Array(buffer);
     for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
     }

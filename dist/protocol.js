@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Protocol decoders for Traccar/OsmAnd ingestion.
 // Ported from traccar-rs osmand.rs
@@ -33,25 +33,25 @@ export function decodeOsmAndQuery(params) {
     }
     position.serverTime = new Date().toISOString();
     if (params.batt !== undefined) {
-        position.attributes.batteryLevel = params.batt;
+        (position.attributes ??= {}).batteryLevel = params.batt;
     }
     if (params.charge !== undefined) {
-        position.attributes.charge = params.charge;
+        (position.attributes ??= {}).charge = params.charge;
     }
     if (params.hdop !== undefined) {
-        position.attributes.hdop = params.hdop;
+        (position.attributes ??= {}).hdop = params.hdop;
     }
     if (params.driverUniqueId) {
-        position.attributes.driverUniqueId = params.driverUniqueId;
+        (position.attributes ??= {}).driverUniqueId = params.driverUniqueId;
     }
     if (params.cell) {
-        position.attributes.cell = params.cell;
+        (position.attributes ??= {}).cell = params.cell;
     }
     if (params.wifi) {
-        position.attributes.wifi = params.wifi;
+        (position.attributes ??= {}).wifi = params.wifi;
     }
     if (params.location) {
-        position.attributes.location = params.location;
+        (position.attributes ??= {}).location = params.location;
     }
     return {
         uniqueId: params.id,
@@ -76,26 +76,26 @@ export function decodeOsmAndJson(data) {
     position.deviceTime = position.fixTime;
     position.serverTime = new Date().toISOString();
     if (data.location.is_moving !== undefined) {
-        position.attributes.motion = data.location.is_moving;
+        (position.attributes ??= {}).motion = data.location.is_moving;
     }
     if (data.location.battery) {
-        position.attributes.batteryLevel = data.location.battery.level;
-        position.attributes.charge = data.location.battery.is_charging;
+        (position.attributes ??= {}).batteryLevel = data.location.battery.level;
+        (position.attributes ??= {}).charge = data.location.battery.is_charging;
     }
     if (data.location.event) {
-        position.attributes.event = data.location.event;
+        (position.attributes ??= {}).event = data.location.event;
     }
     if (data.location.odometer !== undefined) {
-        position.attributes.odometer = data.location.odometer;
+        (position.attributes ??= {}).odometer = data.location.odometer;
     }
     if (data.location.activity) {
-        position.attributes.activity = data.location.activity;
+        (position.attributes ??= {}).activity = data.location.activity;
     }
     if (data.location.alarm) {
-        position.attributes.alarm = data.location.alarm;
+        (position.attributes ??= {}).alarm = data.location.alarm;
     }
     if (data.location.extras) {
-        position.attributes.extras = data.location.extras;
+        (position.attributes ??= {}).extras = data.location.extras;
     }
     return {
         uniqueId: data.device_id,
@@ -109,7 +109,7 @@ export function msToKnots(ms) {
 /** Parse WKT circle: CIRCLE(lat lon, radius) -> {lat, lon, radius}. */
 export function parseWktCircle(wkt) {
     const match = wkt.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([-\d.]+)\s*\)/i);
-    if (!match)
+    if (!match || !match[1] || !match[2] || !match[3])
         return null;
     return {
         lat: parseFloat(match[1]),
@@ -120,13 +120,13 @@ export function parseWktCircle(wkt) {
 /** Parse WKT polygon: POLYGON((lon lat, ...)) -> [{lat, lon}, ...]. */
 export function parseWktPolygon(wkt) {
     const match = wkt.match(/POLYGON\s*\(\s*\((.*)\)\s*\)/i);
-    if (!match)
+    if (!match || !match[1])
         return null;
     const coords = match[1].split(",").map((c) => c.trim());
     const points = [];
     for (const coord of coords) {
         const parts = coord.split(/\s+/);
-        if (parts.length >= 2) {
+        if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
             points.push({ lon: parseFloat(parts[0]), lat: parseFloat(parts[1]) });
         }
     }
@@ -147,8 +147,12 @@ export function pointInCircle(lat, lon, circle) {
 export function pointInPolygon(lat, lon, polygon) {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lon, yi = polygon[i].lat;
-        const xj = polygon[j].lon, yj = polygon[j].lat;
+        const pi = polygon[i];
+        const pj = polygon[j];
+        if (pi === undefined || pj === undefined)
+            continue;
+        const xi = pi.lon, yi = pi.lat;
+        const xj = pj.lon, yj = pj.lat;
         const intersect = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
         if (intersect)
             inside = !inside;

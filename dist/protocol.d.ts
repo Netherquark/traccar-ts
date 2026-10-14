@@ -1,4 +1,4 @@
-import type { Position } from "./models.ts";
+import type { Position } from "./models";
 export interface OsmAndQueryData {
     id: string;
     lat: number;

@@ -1,0 +1,48 @@
+name = "traccar-ts"
+main = "src/worker.ts"
+compatibility_date = "2026-10-14"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database for positions, devices, users, etc.
+[[d1_databases]]
+binding = "DB"
+database_name = "traccar-db"
+database_id = "local"
+migrations_dir = "migrations"
+
+# KV for session tokens, rate limiting
+[[kv_namespaces]]
+binding = "KV"
+id = "local"
+
+# Queues for async processing
+[[queues.producers]]
+binding = "NOTIFY_QUEUE"
+queue = "traccar-notify"
+
+[[queues.consumers]]
+queue = "traccar-notify"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+
+# R2 for exports/archives
+[[r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "traccar-archive"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "DEVICE_DO"
+class_name = "DeviceDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DeviceDO"]
+
+[vars]
+ENVIRONMENT = "development"
+CONTRACT_VERSION = "v1"
+TOKEN_SECRET = "dev-secret-change-in-production"
+SHARE_TOKEN_PEPPER = "dev-pepper-change-in-production"
+INTERNAL_SIGNING_KEY = "dev-internal-change-in-production"

@@ -3,7 +3,7 @@
 //
 // Processing pipeline - ported from traccar-rs processing.rs
 
-import type { Position } from "./models.ts";
+import type { Position } from "./models";
 
 const EARTH_RADIUS_METERS = 6371000;
 const MOTION_SPEED_THRESHOLD_KNOTS = 1;
@@ -26,7 +26,7 @@ export function calculateDistance(positions: Position[]): number {
   for (let i = 1; i < positions.length; i++) {
     const prev = positions[i - 1];
     const curr = positions[i];
-    if (prev.valid && curr.valid) {
+    if (prev !== undefined && curr !== undefined && prev.valid && curr.valid) {
       total += distanceMeters(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
     }
   }
@@ -78,8 +78,11 @@ function pointInCircle(lat: number, lon: number, circle: { lat: number; lon: num
 function pointInPolygon(lat: number, lon: number, polygon: { lat: number; lon: number }[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lon, yi = polygon[i].lat;
-    const xj = polygon[j].lon, yj = polygon[j].lat;
+    const pi = polygon[i];
+    const pj = polygon[j];
+    if (pi === undefined || pj === undefined) continue;
+    const xi = pi.lon, yi = pi.lat;
+    const xj = pj.lon, yj = pj.lat;
     const intersect = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
     if (intersect) inside = !inside;
   }
@@ -92,11 +95,27 @@ export function alarmToEventType(alarm: string): string[] {
 }
 
 /** Process a new position and generate events. */
-export interface ProcessedPosition extends Position {
+export interface ProcessedPosition {
+  id: number;
+  deviceId: number;
+  protocol: string | null;
+  deviceTime: string | null;
+  fixTime: string | null;
+  serverTime: string;
+  valid: boolean;
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  speed: number;
+  course: number;
+  address: string | null;
+  accuracy: number;
+  network: Position["network"];
+  geofenceIds: number[] | null;
+  attributes: Record<string, unknown>;
   distance?: number;
   totalDistance?: number;
   motion?: boolean;
-  geofenceIds?: number[] | null;
   events?: string[];
 }
 
@@ -141,7 +160,12 @@ export async function processPosition(
     }
   }
   if (geofenceEvents.length > 0) {
-    processed.geofenceIds = geofences.filter((_, i) => geofenceEvents.some((e) => e.includes(`:${geofences[i].id}`))).map((g) => g.id);
+    processed.geofenceIds = geofences
+      .filter((_, i) => geofenceEvents.some((e) => {
+        const gf = geofences[i];
+        return gf !== undefined && e.includes(`:${gf.id}`);
+      }))
+      .map((g) => g.id);
     processed.events = geofenceEvents;
   }
 
@@ -156,18 +180,18 @@ export async function processPosition(
 
 function parseWktCircle(wkt: string): { lat: number; lon: number; radius: number } | null {
   const match = wkt.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([-\d.]+)\s*\)/i);
-  if (!match) return null;
+  if (!match || !match[1] || !match[2] || !match[3]) return null;
   return { lat: parseFloat(match[1]), lon: parseFloat(match[2]), radius: parseFloat(match[3]) };
 }
 
 function parseWktPolygon(wkt: string): { lat: number; lon: number }[] | null {
   const match = wkt.match(/POLYGON\s*\(\s*\((.*)\)\s*\)/i);
-  if (!match) return null;
+  if (!match || !match[1]) return null;
   const coords = match[1].split(",").map((c) => c.trim());
   const points: { lat: number; lon: number }[] = [];
   for (const coord of coords) {
     const parts = coord.split(/\s+/);
-    if (parts.length >= 2) {
+    if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
       points.push({ lon: parseFloat(parts[0]), lat: parseFloat(parts[1]) });
     }
   }

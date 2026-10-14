@@ -1,4 +1,4 @@
-import type { Position } from "./models.ts";
+import type { Position } from "./models";
 /** Haversine great-circle distance in meters. */
 export declare function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number;
 /** Calculate total distance from position array. */
@@ -15,11 +15,27 @@ export declare function checkPolygonGeofence(position: Position, polygon: {
 /** Alarm to event type mapping. */
 export declare function alarmToEventType(alarm: string): string[];
 /** Process a new position and generate events. */
-export interface ProcessedPosition extends Position {
+export interface ProcessedPosition {
+    id: number;
+    deviceId: number;
+    protocol: string | null;
+    deviceTime: string | null;
+    fixTime: string | null;
+    serverTime: string;
+    valid: boolean;
+    latitude: number;
+    longitude: number;
+    altitude: number;
+    speed: number;
+    course: number;
+    address: string | null;
+    accuracy: number;
+    network: Position["network"];
+    geofenceIds: number[] | null;
+    attributes: Record<string, unknown>;
     distance?: number;
     totalDistance?: number;
     motion?: boolean;
-    geofenceIds?: number[];
     events?: string[];
 }
 export declare function processPosition(position: Position, previousPosition: Position | null, deviceAttributes: Record<string, unknown>, geofences: Array<{
