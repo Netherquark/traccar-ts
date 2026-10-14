@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // traccar-ts - Traccar server protocol implementation for Cloudflare Workers
 // Main export entry point.

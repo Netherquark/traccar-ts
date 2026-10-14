@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Auth utilities ported from traccar-rs:
 // - PBKDF2-HMAC-SHA256 password hashing (200k iterations)
@@ -91,10 +91,11 @@ export async function signToken(payload: TokenPayload, secret: string): Promise<
     false,
     ["sign"],
   );
-  const data = encoder.encode(JSON.stringify(payload));
-  const signature = await crypto.subtle.sign("HMAC", key, data);
+  const payloadJson = JSON.stringify(payload);
+  const payloadB64 = bufferToBase64Url(encoder.encode(payloadJson));
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadB64));
   const sigBytes = new Uint8Array(signature);
-  return `${bufferToBase64Url(encoder.encode(JSON.stringify(payload)))}.${bufferToBase64Url(sigBytes)}`;
+  return `${payloadB64}.${bufferToBase64Url(sigBytes)}`;
 }
 
 /** Verify and decode a signed token. */
@@ -110,7 +111,12 @@ export async function verifyToken(token: string, secret: string): Promise<TokenP
     false,
     ["verify"],
   );
-  const signature = base64UrlToBuffer(sigB64);
+  let signature: Uint8Array;
+  try {
+    signature = base64UrlToBuffer(sigB64);
+  } catch {
+    return null;
+  }
   const valid = await crypto.subtle.verify(
     "HMAC",
     key,
@@ -119,8 +125,9 @@ export async function verifyToken(token: string, secret: string): Promise<TokenP
   );
   if (!valid) return null;
   try {
-    const payloadJson = bufferToBase64Url(base64UrlToBuffer(payloadB64));
-    return JSON.parse(payloadJson) as TokenPayload;
+    const payloadBytes = base64UrlToBuffer(payloadB64);
+    const decoder = new TextDecoder();
+    return JSON.parse(decoder.decode(payloadBytes)) as TokenPayload;
   } catch {
     return null;
   }

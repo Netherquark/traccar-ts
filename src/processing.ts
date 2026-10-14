@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Processing pipeline - ported from traccar-rs processing.rs
 
@@ -35,10 +35,11 @@ export function calculateDistance(positions: Position[]): number {
 
 /** Motion detection: explicit motion attr > ignition attr > speed threshold. */
 export function detectMotion(position: Position, prevPosition: Position | null): boolean {
-  if (position.attributes.motion === true) return true;
-  if (position.attributes.ignition === true) return true;
+  if (!position.valid) return false;
+  if (position.attributes?.motion === true) return true;
+  if (position.attributes?.ignition === true) return true;
   if (position.speed >= MOTION_SPEED_THRESHOLD_KNOTS) return true;
-  if (prevPosition && position.valid && prevPosition.valid) {
+  if (prevPosition && prevPosition.valid) {
     const dist = distanceMeters(
       prevPosition.latitude,
       prevPosition.longitude,
@@ -95,7 +96,7 @@ export interface ProcessedPosition extends Position {
   distance?: number;
   totalDistance?: number;
   motion?: boolean;
-  geofenceIds?: number[];
+  geofenceIds?: number[] | null;
   events?: string[];
 }
 
@@ -145,7 +146,7 @@ export async function processPosition(
   }
 
   // Alarm events
-  if (position.attributes.alarm) {
+  if (position.attributes?.alarm) {
     const alarms = alarmToEventType(String(position.attributes.alarm));
     processed.events = [...(processed.events ?? []), ...alarms];
   }

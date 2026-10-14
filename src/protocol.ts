@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Protocol decoders for Traccar/OsmAnd ingestion.
 // Ported from traccar-rs osmand.rs

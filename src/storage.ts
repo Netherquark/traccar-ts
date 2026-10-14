@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2026 ASK / Riding Kompanion contributors
+// Copyright (C) 2026 traccar-ts contributors
 //
 // Storage abstraction - ported from traccar-rs Store trait.
 
@@ -23,7 +23,8 @@ export type EntityKind =
   | "position"
   | "server"
   | "revokedToken"
-  | "audit";
+  | "audit"
+  | "shareToken";
 
 export interface Filter {
   kind: EntityKind;
@@ -162,8 +163,7 @@ export class MemoryStore implements Store {
   async getQueuedCommands(deviceId: number): Promise<QueuedCommand[]> {
     const map = this.getMap("queuedCommand");
     return Array.from(map.values())
-      .filter((c) => (c as QueuedCommand).deviceId === deviceId && (c as QueuedCommand).status === "queued")
-      as QueuedCommand[];
+      .filter((c) => (c as QueuedCommand).deviceId === deviceId && (c as QueuedCommand).status === "queued") as QueuedCommand[];
   }
 
   async markCommandSent(commandId: number): Promise<void> {
