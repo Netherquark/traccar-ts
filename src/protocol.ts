@@ -4,25 +4,7 @@
 // Protocol decoders for Traccar/OsmAnd ingestion.
 // Ported from traccar-rs osmand.rs and Traccar Java OsmAndProtocolDecoder.
 
-import type { Position } from "./models";
-
-export interface CellTower {
-  mcc: number;
-  mnc: number;
-  lac: number;
-  cid: number;
-  signal?: number;
-}
-
-export interface WifiAccessPoint {
-  mac: string;
-  signal?: number;
-}
-
-export interface Network {
-  cellTowers?: CellTower[];
-  wifiAccessPoints?: WifiAccessPoint[];
-}
+import type { Position, Network, CellTower, WifiAccessPoint } from "./models";
 
 export interface OsmAndQueryData {
   id: string;
@@ -135,9 +117,9 @@ function collectNetwork(cell: string | string[] | undefined, wifi: string | stri
     const lac = parseInt(parts[2]!, 10);
     const cid = parseInt(parts[3]!, 10);
     const signal = parts.length > 4 ? parseInt(parts[4]!, 10) : undefined;
-    if (!network) network = {};
+    if (!network) network = { cellTowers: [], wifiAccessPoints: [] };
     if (!network.cellTowers) network.cellTowers = [];
-    network.cellTowers.push({ mcc, mnc, lac, cid, signal: isNaN(signal as any) ? undefined : signal });
+    network.cellTowers.push({ mcc, mnc, lac, cid, signalStrength: isNaN(signal as any) ? 0 : (signal as number) });
   }
   for (const w of wifis) {
     if (!w) continue;
@@ -145,9 +127,9 @@ function collectNetwork(cell: string | string[] | undefined, wifi: string | stri
     const macRaw = parts[0] ?? "";
     const signal = parts.length > 1 ? parseInt(parts[1]!, 10) : undefined;
     const mac = macRaw.replace(/-/g, ":").toLowerCase();
-    if (!network) network = {};
+    if (!network) network = { cellTowers: [], wifiAccessPoints: [] };
     if (!network.wifiAccessPoints) network.wifiAccessPoints = [];
-    network.wifiAccessPoints.push({ mac, signal: isNaN(signal as any) ? undefined : signal });
+    network.wifiAccessPoints.push({ macAddress: mac, signalStrength: isNaN(signal as any) ? 0 : (signal as number) });
   }
   return network;
 }

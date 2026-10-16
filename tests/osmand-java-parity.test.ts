@@ -132,9 +132,9 @@ describe("osmand query - traccar java test vectors (subset)", () => {
     expect(r.uniqueId).toBe("123456");
     expect(r.network?.cellTowers?.length).toBe(2);
     expect(r.network.cellTowers[0].mcc).toBe(257);
-    expect(r.network.cellTowers[1].signal).toBe(-90);
-    expect(r.network.wifiAccessPoints[0].mac).toBe("00:14:22:01:23:45");
-    expect(r.network.wifiAccessPoints[0].signal).toBe(-80);
+    expect(r.network.cellTowers[1].signalStrength).toBe(-90);
+    expect(r.network.wifiAccessPoints[0].macAddress).toBe("00:14:22:01:23:45");
+    expect(r.network.wifiAccessPoints[0].signalStrength).toBe(-80);
   });
 
   it("location string lat,lon", () => {
