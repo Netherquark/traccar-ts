@@ -169,6 +169,6 @@ export async function initDatabase(db: D1Database): Promise<void> {
   ];
 
   for (const sql of statements) {
-    await db.exec(sql);
+    await db.prepare(sql).run();
   }
 }

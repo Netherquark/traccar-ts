@@ -4,8 +4,8 @@
 // OsmAnd/Traccar ingestion handler - accepts device positions without auth.
 
 import type { Env } from "../types/env.ts";
-import { decodeOsmAndQuery, decodeOsmAndJson, type OsmAndQueryData, type OsmAndJsonData } from "../../protocol.ts";
-import type { Position } from "../../models.ts";
+import { decodeOsmAndQuery, decodeOsmAndJson, type OsmAndQueryData, type OsmAndJsonData } from "../protocol.ts";
+import type { Position } from "../models.ts";
 import type { ExecutionContext } from "@cloudflare/workers-types";
 
 export class IngestionHandler {
@@ -14,16 +14,16 @@ export class IngestionHandler {
   async handle(request: Request, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // Handle JSON ingestion (Traccar Client format) - check content type first
+    if (request.method === "POST" && request.headers.get("content-type")?.includes("application/json")) {
+      return this.handleOsmAndJson(request);
+    }
+
     // Handle both GET and POST for OsmAnd query string
     if (request.method === "GET" || request.method === "POST") {
       if (url.pathname === "/osmand" || url.pathname === "/") {
         return this.handleOsmAndQuery(request);
       }
-    }
-
-    // Handle JSON ingestion (Traccar Client format)
-    if (request.method === "POST" && request.headers.get("content-type")?.includes("application/json")) {
-      return this.handleOsmAndJson(request);
     }
 
     return new Response("Not Found", { status: 404 });

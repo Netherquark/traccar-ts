@@ -55,6 +55,20 @@ export class App {
       }, { headers: this.corsHeaders() });
     }
 
+    // Server info - public (matches Traccar Java /api/server)
+    if (url.pathname === "/api/server" && request.method === "GET") {
+      return Response.json({
+        id: 1,
+        version: this.env.CONTRACT_VERSION ?? "v1",
+        status: "running",
+      }, { headers: this.corsHeaders() });
+    }
+
+    // Session login - public (matches Traccar Java /api/session POST)
+    if (url.pathname === "/api/session" && request.method === "POST") {
+      return this.router.handle(request, { user: { id: 0, email: "" } } as any, ctx);
+    }
+
     // OsmAnd/Traccar ingestion (no /api prefix, no auth required for device ingestion)
     if (url.pathname === "/osmand" || url.pathname === "/") {
       return this.ingestion.handle(request, ctx);

@@ -129,7 +129,7 @@ describe("protocol decoders", () => {
           timestamp: 1700000000000,
           is_moving: true,
           battery: {
-            level: 90,
+            level: 0.9,
             is_charging: false,
           },
           event: "test",

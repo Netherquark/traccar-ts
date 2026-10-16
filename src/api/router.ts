@@ -6,6 +6,7 @@
 import type { Env } from "../types/env.ts";
 import type { Principal } from "./auth.ts";
 import type { ExecutionContext } from "@cloudflare/workers-types";
+import { verifyPassword, signToken } from "../auth.ts";
 
 type RouteHandler = (request: Request, principal: Principal, ctx: ExecutionContext, params?: Record<string, string>) => Promise<Response>;
 
@@ -87,7 +88,7 @@ export class Router {
   }
 
   private add(method: string, path: string, handler: RouteHandler): void {
-    this.handlers.set(`${method}:${path}`, handler);
+    this.handlers.set(`${method}:${path}`, handler.bind(this));
   }
 
   async handle(request: Request, principal: Principal, ctx: ExecutionContext): Promise<Response> {
@@ -139,7 +140,68 @@ export class Router {
 
   // Route handlers
   private async handleSessionCreate(request: Request, principal: Principal, ctx: ExecutionContext): Promise<Response> {
-    return Response.json({ message: "Session created", token: "demo-token" });
+    // Read credentials from form body or JSON body
+    let email = "";
+    let password = "";
+    const contentType = request.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      try {
+        const body = await request.json();
+        email = body.email ?? "";
+        password = body.password ?? "";
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    } else {
+      try {
+        const formData = await request.formData();
+        email = formData.get("email") ?? "";
+        password = formData.get("password") ?? "";
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid form data" }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ error: "Missing credentials" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    // Look up user by email
+    const user = await this.env.DB.prepare(
+      "SELECT * FROM users WHERE email = ?"
+    ).bind(email).first<{ id: number; email: string; name: string | null; administrator: number; readonly: number; device_limit: number; device_readonly: number; password_hash: string }>();
+
+    if (!user || !(await verifyPassword(password, user.password_hash))) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    // Create token
+    const token = await signToken({
+      i: Date.now(),
+      u: user.id,
+      e: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    }, this.env.TOKEN_SECRET);
+
+    return Response.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      administrator: Boolean(user.administrator),
+      token,
+    });
   }
 
   private async handleSessionCurrent(request: Request, principal: Principal, ctx: ExecutionContext): Promise<Response> {

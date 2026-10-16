@@ -4,7 +4,7 @@
 // Authentication middleware - supports Basic, Bearer token, and session cookie.
 
 import type { Env } from "../types/env.ts";
-import { hashPassword, verifyPassword, signToken, verifyToken, generateTokenSecret } from "../../auth.ts";
+import { hashPassword, verifyPassword, signToken, verifyToken, generateTokenSecret } from "../auth.ts";
 
 export interface Principal {
   user: User;
@@ -86,7 +86,7 @@ export class AuthMiddleware {
 
   private async authenticateBasic(email: string, password: string): Promise<Principal | null> {
     const user = await this.env.DB.prepare(
-      "SELECT * FROM users WHERE email = ? AND disabled = 0"
+      "SELECT * FROM users WHERE email = ?"
     ).bind(email).first<User & { password_hash: string }>();
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
@@ -112,7 +112,7 @@ export class AuthMiddleware {
     if (!payload) return null;
 
     const user = await this.env.DB.prepare(
-      "SELECT * FROM users WHERE id = ? AND disabled = 0"
+      "SELECT * FROM users WHERE id = ?"
     ).bind(payload.u).first<User & { password_hash: string }>();
 
     if (!user) return null;

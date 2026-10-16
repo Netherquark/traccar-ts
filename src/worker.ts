@@ -5,6 +5,7 @@
 
 import type { D1Database, KVNamespace, Queue, R2Bucket, DurableObjectNamespace, ExecutionContext, MessageBatch, ScheduledController, ExportedHandler } from "@cloudflare/workers-types";
 import { App } from "./app.ts";
+import { DeviceDO } from "./durable_objects/DeviceDO.ts";
 
 export interface Env {
   DB: D1Database;
@@ -45,3 +46,5 @@ export default {
     await app.runScheduled(controller, ctx);
   },
 } satisfies ExportedHandler<Env>;
+
+export { DeviceDO };
