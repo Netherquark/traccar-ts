@@ -257,8 +257,8 @@ export function decodeOsmAndJson(data: OsmAndJsonData): DecodedPosition {
       position.course = heading;
     }
     const accuracy = coords.accuracy;
-    // minAccuracy default 0; apply if present (gate: accuracy >= 0 always passes default)
-    if (accuracy !== undefined && accuracy !== null) {
+    // Traccar Java: accuracy applied only if >= osmand.minAccuracy (default 10.0)
+    if (accuracy !== undefined && accuracy !== null && accuracy >= 10) {
       position.accuracy = accuracy;
     }
     if (coords.altitude !== undefined && coords.altitude !== null) {
@@ -283,7 +283,7 @@ export function decodeOsmAndJson(data: OsmAndJsonData): DecodedPosition {
   if (data.location.battery) {
     const level = data.location.battery.level;
     if (level !== undefined && level !== null && level >= 0) {
-      attrs.batteryLevel = Math.round(level * 100);
+      attrs.batteryLevel = Math.trunc(level * 100);
     }
     attrs.charge = Boolean(data.location.battery.is_charging);
   }

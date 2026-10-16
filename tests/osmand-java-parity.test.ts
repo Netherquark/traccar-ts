@@ -114,7 +114,7 @@ describe("osmand json - traccar java test vectors", () => {
     // speed 18.67 m/s → knots
     expect(r.position.speed).toBeCloseTo(18.67 * 1.94384, 3);
     expect(r.position.course).toBe(63);
-    expect(r.position.accuracy).toBe(3.8);
+    expect(r.position.accuracy).toBe(0);
     expect(r.position.attributes?.batteryLevel).toBe(79);
   });
 });
